@@ -1,0 +1,311 @@
+<html>
+	<head>
+    	<meta name="viewport" content="initial-scale=1.0">
+    	<style>
+		@media only screen 
+	and (min-width : 640px) 
+	and (max-width : 1920px) {
+	
+	#container,  {
+	width: 100%;
+	height:100%;
+	margin:0;
+	padding:0;
+	}
+	 #header  {
+	width: 100%;
+	margin:0;
+	padding:0;
+	}
+	#map3d
+	{
+	width: 60%;
+	height:50%;
+	margin-bottom:10px;
+	padding:0;
+	}
+	 #map2
+	{
+	width: 60%;
+	height:50%;
+	margin-bottom:10px;
+	padding:0;
+	}
+	    
+	#box
+		{
+			
+			padding: 0px;
+			border: 5px solid gray;
+			margin: 0px;
+			font-size:18px;
+			width: 35%;
+			height:48.8%;
+			text-align:justify;
+
+		}
+	#box2
+		{
+		
+			padding: 0px;
+			border: 5px solid gray;
+			margin: 0px;
+			font-size:18px;
+			width: 35%;
+			height:48.8%;
+		}
+
+    		body
+		{
+			font-size:75%;
+			font-family:verdana,arial,'sans serif';
+			background-image:url(http://www.dw2f.com/beijing/images/153.jpg);
+			background-repeat:repeat-x;
+			background-color:#FFFFF0;
+			color:#000080;
+			margin:20px;
+		}
+
+    	</style>
+		<meta charset="utf-8" />
+		<title>Sample</title>
+  		<script type="text/javascript" src="https://www.google.com/jsapi"> </script>
+		<script src="http://winter.ceit.uq.edu.au:8080/socket.io/socket.io.js"></script>
+        <script type="text/javascript">
+			//var socket = io.connect('http://localhost:8080/');
+			var socket = io.connect('http://winter.ceit.uq.edu.au:8080');
+			var Lat=null,Long=null, ServiceBroker=null,ExperimentID=null,Usergroup=null,UnitID=null,Rad=null,Status=null,date=null,
+			Time =null;
+			var ge;
+			var ge2;
+			var t;
+			var y;
+   		 	google.load("earth", "1");
+			var temple = null;
+			var temple2 = null;
+			var point = false;
+			socket.on('user message', function(msg) {
+				var temp = msg.msg;
+				var d = eval('('+temp+')'); 
+				 Lat= d.Lat;
+				 Long = d.Long;
+				 ServiceBroker = d.ServiceBroker;
+				 Usergroup=d.Usergroup;
+				 ExperimentID = d["Experiment Id"];
+				 UnitID = d["Unit Id"];
+				 Status = d.StatusCode;
+				 date = d["Date"];
+				 Time=d.Time;
+				 if(UnitID=='1')
+				 {
+					 Rad = 'Radioactivity with absobers'
+				 }
+				 else
+				 {
+					 Rad = 'Radioactivity without absobers'
+				 }	
+				 if(ServiceBroker=='NorthWestern')
+				 {
+					 document.getElementById("nw").style.color="red";
+					 document.getElementById("uq").style.color='#000080';
+					  document.getElementById("mit").style.color='#000080';
+					 }
+				 else if(ServiceBroker =='UQ OpeniLabs')
+				 {
+					 document.getElementById("nw").style.color="#000080";
+					 document.getElementById("uq").style.color='red';
+					  document.getElementById("mit").style.color='#000080';
+					 }
+				 else
+				 {
+					document.getElementById("nw").style.color="#000080";
+					 document.getElementById("uq").style.color='#000080';
+					  document.getElementById("mit").style.color='red';
+					}
+				 			 	
+				 msgbox(d);
+				createPlacemark(temple,temple2);
+				window.clearTimeout(t);
+				window.clearTimeout(y);
+				t=setTimeout(function(){rotate()},15000);
+				y=setTimeout(function(){ZoomOut();},15000);
+				
+			});
+			
+			function msgbox(str) {
+				var box = document.getElementById('box');
+				//var box2 = document.getElementById('box2');
+				var d=new Date();
+				//box.innerHTML ='<strong style="color:#CC3300 ">'+ Rad+'<br>'+d +'<br>'+'ServiceBroker: '+ServiceBroker + '<br>'+'Usergroup: ' +Usergroup+'<br>'+'ExperimentID: '+ExperimentID+'<br>'+'Status: '+Status+'<br>'+'<br>';
+				var weekday=new Array(7);
+				weekday[0]="Sun";
+				weekday[1]="Mon";
+				weekday[2]="Tues";	
+				weekday[3]="Wed";
+				weekday[4]="Thur";
+				weekday[5]="Fri";
+				weekday[6]="Sat";
+				var day = weekday[d.getDay()];
+				
+				var s = 'failed';
+				if(Status=='Completed')
+				{
+					s = 'successful';
+					}
+				box.innerHTML ='<strong style="color:#CC3300 ">'+'Last '+s+' '+Rad+' experiment run by '+Usergroup+' via '+ServiceBroker+' was experiment number '+ExperimentID+' on '+day+' '
+				+date+' at '+Time; 
+				
+			}
+			window.onload = function(){
+				document.body.onkeypress = function(event){
+					var e = window.event || event;
+					if(e.keyCode==13){
+						sendMsg();
+					}
+				}
+			}
+
+    		function init() {
+      			google.earth.createInstance('map3d', initCB3d, failureCB);
+				google.earth.createInstance('map2', initCB, failureCB);
+				
+				
+    		}
+			function initCB3d(instance)
+			{
+				ge = instance;
+      			ge.getWindow().setVisibility(true);
+				ge.getNavigationControl().setVisibility(ge.VISIBILITY_AUTO);
+				ge.getLayerRoot().enableLayerById(ge.LAYER_BORDERS, true);
+				var placemark = ge.createPlacemark('');
+				temple2 = placemark;
+				rotate();			
+			}
+			function rotate()
+			{	//var lookAt = ge.getView().copyAsLookAt(ge.ALTITUDE_RELATIVE_TO_GROUND);
+			var lookAt = ge.getView().copyAsLookAt(ge.ALTITUDE_RELATIVE_TO_GROUND);
+				//if(ServiceBroker==null)
+				//{	
+					if(lookAt.getLongitude()>(-160))
+					{
+					//document.getElementById("box").innerHTML=lookAt.getLongitude()+"";	lookAt.getLatitude()
+  					lookAt.setLatitude(lookAt.getLatitude());
+  					lookAt.setLongitude(lookAt.getLongitude() - 20);
+					lookAt.setRange(20000000);
+  					ge.getView().setAbstractView(lookAt);
+					}
+					else
+					{
+					//document.getElementById("box").innerHTML=lookAt.getLongitude()+"";	
+  					lookAt.setLatitude(lookAt.getLatitude());
+  					lookAt.setLongitude(-lookAt.getLongitude()-20);
+					lookAt.setRange(20000000);
+  					ge.getView().setAbstractView(lookAt);
+					}
+					t=setTimeout(function(){rotate()},100);
+					//T=T+1;
+				//}
+				
+				//document.getElementById("box").innerHTML=T+"";
+				
+			}
+	
+
+    		function initCB(instance) {
+      			ge2 = instance;
+      			ge2.getWindow().setVisibility(true);
+				ge2.getNavigationControl().setVisibility(ge2.VISIBILITY_AUTO);
+				ge2.getLayerRoot().enableLayerById(ge2.LAYER_BORDERS, true);
+				var placemark = ge2.createPlacemark('');
+				temple = placemark;
+    		}
+			
+			function ZoomOut()
+			{		
+					var lookAt = ge2.getView().copyAsLookAt(ge.ALTITUDE_RELATIVE_TO_GROUND);
+					lookAt.setLatitude(lookAt.getLatitude());
+  					lookAt.setLongitude(lookAt.getLongitude());
+					lookAt.setRange(20000000);
+  					ge2.getView().setAbstractView(lookAt);
+			}
+			
+			
+			
+			function createPlacemark(placemark,placemark2) {
+	  			if(Lat!=null)
+	  			{
+      				//var placemark = ge.createPlacemark('');
+      				placemark.setName(ServiceBroker);
+    				placemark2.setName(ServiceBroker);
+					//Create style map for placemark
+      				var icon = ge2.createIcon('');
+      				icon.setHref('http://maps.google.com/mapfiles/kml/paddle/red-circle.png');
+      				var style = ge2.createStyle('');
+     				style.getIconStyle().setIcon(icon);
+	 				//style.getIconStyle().setScale(5);
+     				placemark.setStyleSelector(style);
+    				
+					ge2.getOptions().setFlyToSpeed(0.5);
+      				// Create point
+      				var lookAt = ge2.getView().copyAsLookAt(ge.ALTITUDE_RELATIVE_TO_GROUND);
+	  				lookAt.setLatitude(Lat);
+	  				lookAt.setLongitude(Long);
+	  				lookAt.setRange(250)
+	  				ge2.getView().setAbstractView(lookAt);
+	  
+      				var point = ge2.createPoint('');
+      				point.setLatitude(Lat);
+     				point.setLongitude(Long);
+      				placemark.setGeometry(point);
+	  				ge2.getFeatures().appendChild(placemark);
+					
+				
+      			// Create style map for placemark
+      				var icon = ge.createIcon('');
+      				icon.setHref('http://maps.google.com/mapfiles/kml/paddle/red-circle.png');
+      				var style = ge.createStyle('');
+     				style.getIconStyle().setIcon(icon);
+	 				style.getIconStyle().setScale(10);
+     				placemark2.setStyleSelector(style);
+    				
+					ge.getOptions().setFlyToSpeed(0.5);
+      				// Create point
+      				var lookAt = ge.getView().copyAsLookAt(ge.ALTITUDE_RELATIVE_TO_GROUND);
+	  				lookAt.setLatitude(Lat);
+	  				lookAt.setLongitude(Long);
+	  				lookAt.setRange(20000000)
+	  				ge.getView().setAbstractView(lookAt);
+	  
+      				var point = ge.createPoint('');
+      				point.setLatitude(Lat);
+     				point.setLongitude(Long);
+      				placemark2.setGeometry(point);
+	  				ge.getFeatures().appendChild(placemark2);
+					
+					
+					
+					
+	 			}
+				
+    		}
+    		function failureCB(errorCode) {
+    		}
+		</script>
+    
+	</head>
+	<body onLoad="init()"> 
+    <div id="container" style="position:relative;">
+      <div id="header" "><h1 style="margin-bottom:0;">Mapping Radioactivity Experiment Activity</h1></div>
+      <div id="map3d" style="float:left;"></div>
+      <div id='box2' style="float:left;">
+      <p >The ServiceBroker as below:</p>
+      <p id="uq">■ The University of Queensland</p>
+      <p id="mit">■ Massachusetts Institute of Technology</p>
+      <p id="nw">■ The NorthWestern University</p>
+      </div>
+      <br>
+      <div id="map2" style="float:left;"></div>
+      <div id='box' style="float:left;"></div>
+    </div>
+	</body>
+</html>
